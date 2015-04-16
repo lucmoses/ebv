@@ -25,8 +25,7 @@ void LocalMaximum();
 int TextColor;
 int avgDxy[3][IMG_SIZE];
 int Mc[IMG_SIZE];
-int McLocalMax[IMG_SIZE];
-int absmax;
+int absmax; // Prozentsatz von absoluten maximu über das ganze bild
 
 void ResetProcess() {
 	//called when "reset" button is pressed
@@ -49,7 +48,6 @@ void ProcessFrame() {
 		//example for copying sensor image to background image
 		memcpy(data.u8TempImage[BACKGROUND], data.u8TempImage[SENSORIMG],
 		IMG_SIZE);
-		//example for time measurement
 
 		//Edge dedector
 		CalcDeriv();
@@ -57,8 +55,8 @@ void ProcessFrame() {
 			AvgDeriv(i);
 		}
 		absmax = 0;
-		//for (int i = 0; i < IMG_SIZE; i++) {
-		for (int r = 7 * nc; r < nr * nc - 7 * nc; r += nc) {/* we skip the first and last line */
+		// Eckenmass
+		for (int r = 7 * nc; r < nr * nc - 7 * nc; r += nc) {/* we skip the first six and last six line. Boarders */
 			for (int c = 7; c < nc - 7; c++) {
 				int i = r + c;
 				Mc[i] = ((avgDxy[0][i] >> Oshift) * (avgDxy[1][i] >> Oshift)
@@ -68,27 +66,20 @@ void ProcessFrame() {
 										+ (avgDxy[1][i] >> Oshift))
 								* ((avgDxy[0][i] >> Oshift)
 										+ (avgDxy[1][i] >> Oshift))) >> 7);
-				absmax = MAX(Mc[i], absmax);
+				absmax = MAX(Mc[i], absmax); // Den wert des abseluten Maximum über das ganze bild wird ermittelt
 			}
 		}
 
-		absmax = (absmax/100*data.ipc.state.nThreshold);
+		absmax = (absmax/100*data.ipc.state.nThreshold); // Ein Prozentsatz des Absoluten max wird ermittelt
 
 
 		t1 = OscSupCycGet();
 		LocalMaximum();
-		/*for (int i = 0; i < IMG_SIZE; i++) {
-		 data.u8TempImage[THRESHOLD][i] = (uint8) MIN(255,
-		 MAX(0, (McLocalMax[i])));
-		 }*/
+
 		t2 = OscSupCycGet();
 
 		//example for log output to console
 		OscLog(INFO, "required = %d us\n", OscSupCycToMicroSecs(t2 - t1));
-
-		//example for drawing output
-		//draw Boxes
-		//DrawBoundingBox(x1-SizeBox, y1+SizeBox, x1+SizeBox, y1-SizeBox, false, GREEN);
 	}
 }
 
@@ -153,75 +144,25 @@ void AvgDeriv(int Index) {
 }
 
 void LocalMaximum() {
-	//memset(McLocalMax, 0, sizeof(McLocalMax));
 	int c, r;
 
-	for (r = 7 * nc; r < nr * nc - 7 * nc; r += nc) {/* we skip the first and last line */
+	for (r = 7 * nc; r < nr * nc - 7 * nc; r += nc) {/* we skip the first six and last six line */
 		for (c = 7; c < nc - 7; c++) {
 			/* do pointer arithmetics with respect to center pixel location */
 			int* p = &Mc[c + r];
-			/* implement Sobel filter */
+			/* implement max filter */
 			int localMax = 0;
 			for (int i = -6; i < 7; i++) {
 				for (int j = -6; j < 7; j++) {
 					if (localMax <= *(p + nc * i + j)) {
-						//	McLocalMax[c+r+iHelp*nc+jHelp] = 0;
 						localMax = *(p + i * nc + j);
 					}
-					//	else if(localMax > *(p+nc*i+j)){
-					//	McLocalMax[c+r+i*nc+j] = 0;
-
-					//}
 				}
-
 			}
-			//McLocalMax[c+r+iHelp*nc+jHelp] = *(p+nc*iHelp+jHelp);
-			if (localMax == *p && *p > absmax) {
+			if (localMax == *p && *p > absmax) { // Die maxima mit werden mit einer grünen box im Bild Markiert
 				DrawBoundingBox(c - SizeBox, r / nc + SizeBox, c + SizeBox,
 						r / nc - SizeBox, false, GREEN);
-
-				//OscLog(INFO, "c = %d ; r = %d\n",c,r);
 			}
-		}
-	}
-}
-
-void LocalMaximumV2() {
-	//do average in x-direction
-	int c, r;
-	int helpBuf[IMG_SIZE];
-	memset(helpBuf, 0, sizeof(helpBuf));
-	int Border = 0;
-	for (r = nc; r < nr * nc - nc; r += nc) {/* we skip first and last lines (empty) */
-		for (c = Border + 1; c < nc - (Border + 1); c++) {/* +1 because we have one empty border column */
-			/* do pointer arithmetics with respect to center pixel location */
-			int* p = &Mc[c + r];
-			int localMax = *p;
-			for (int j = -5; j < 7; j++) {
-								if (localMax <= *(p + nc + j)) {
-									//	McLocalMax[c+r+iHelp*nc+jHelp] = 0;
-									localMax = *(p +  nc + 6 * j);
-			//now averaged
-			helpBuf[r + c] = ( 8);
-		}
-	}
-	//do average in y-direction
-	for (r = nc; r < nr * nc - nc; r += nc) {/* we skip first and last lines (empty) */
-		for (c = Border + 1; c < nc - (Border + 1); c++) {/* +1 because we have one empty border column */
-			/* do pointer arithmetics with respect to center pixel location */
-			int* p = &helpBuf[r + c];
-
-
-								}
-								//	else if(localMax > *(p+nc*i+j)){
-								//	McLocalMax[c+r+i*nc+j] = 0;
-
-								//}
-							}
-			//now averaged
-
-			//	data.u8TempImage[THRESHOLD][r + c] = (uint8) MIN(255,
-			//		MAX(0, (avgDxy[2][c+r])>>8));
 		}
 	}
 }
